@@ -1,5 +1,5 @@
 import { EditTool } from "@/lib/editPdf";
-import { MousePointer2, Type, Highlighter, Pen, Image as ImageIcon, Square, Search, ZoomIn, ZoomOut, Save } from "lucide-react";
+import { MousePointer2, Type, Highlighter, Pen, Image as ImageIcon, Square, Search, ZoomIn, ZoomOut, Save, Undo2, Redo2 } from "lucide-react";
 import { PrimaryBtn } from "@/components/ui/PrimaryBtn";
 import { cn } from "@/lib/utils";
 
@@ -10,9 +10,13 @@ interface ToolbarProps {
   setScale: (scale: number | ((s: number) => number)) => void;
   onSave: () => void;
   isProcessing: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
-export function Toolbar({ activeTool, setActiveTool, scale, setScale, onSave, isProcessing }: ToolbarProps) {
+export function Toolbar({ activeTool, setActiveTool, scale, setScale, onSave, isProcessing, onUndo, onRedo, canUndo, canRedo }: ToolbarProps) {
   const tools: { id: EditTool; icon: any; label: string }[] = [
     { id: "select", icon: MousePointer2, label: "Select" },
     { id: "text", icon: Type, label: "Text Box" },
@@ -26,6 +30,31 @@ export function Toolbar({ activeTool, setActiveTool, scale, setScale, onSave, is
   return (
     <div className="sticky top-[64px] z-40 w-full bg-surface2 border-b border-surface-border p-2 flex items-center justify-between">
       <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 mr-2 px-2 border-r border-surface-border">
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            className={cn(
+              "p-2 rounded-lg transition-colors flex items-center gap-2 flex-shrink-0",
+              canUndo ? "text-muted hover:text-white hover:bg-surface active:bg-accent-orange" : "text-muted opacity-35 cursor-not-allowed"
+            )}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="w-5 h-5" />
+          </button>
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={cn(
+              "p-2 rounded-lg transition-colors flex items-center gap-2 flex-shrink-0",
+              canRedo ? "text-muted hover:text-white hover:bg-surface active:bg-accent-orange" : "text-muted opacity-35 cursor-not-allowed"
+            )}
+            title="Redo (Ctrl+Y)"
+          >
+            <Redo2 className="w-5 h-5" />
+          </button>
+        </div>
+
         {tools.map((t) => (
           <button
             key={t.id}

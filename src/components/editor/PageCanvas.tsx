@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { EditTool, PageEdit, BoxEdit } from "@/lib/editPdf";
+import { EditTool, PageEdit, BoxEdit, mapPdfFontToCSS } from "@/lib/editPdf";
 import { TextBoxOverlay } from "./TextBoxOverlay";
 
 interface PageCanvasProps {
@@ -100,28 +100,88 @@ export function PageCanvas({
     }
   }, [edits, isDrawing, currentPath, scale]);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = async (e: React.PointerEvent) => {
     if (!interactRef.current || !drawCanvasRef.current) return;
     const rect = interactRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
 
     if (activeTool === "text") {
+      let detectedFontFamily = "Helvetica, Arial, sans-serif";
+      let detectedFontSize = 12;
+      let detectedBold = false;
+      let detectedItalic = false;
+      let detectedFontNameDisplay = "Default font applied";
+      
+      const pdfX = clientX / scale;
+      const pdfY = clientY / scale;
+
+      try {
+        const page = await pdfDoc.getPage(pageIndex + 1);
+        const textContent = await page.getTextContent({ includeMarkedContent: false });
+        
+        let minDistance = Infinity;
+        let closestItem: any = null;
+
+        const viewport = page.getViewport({ scale: 1 });
+        const pageHeight = viewport.height;
+
+        for (const item of textContent.items) {
+          if ('transform' in item) {
+            const tx = item.transform[4];
+            const ty = item.transform[5];
+            
+            const itemX = tx;
+            const itemY = pageHeight - ty;
+            
+            const dist = Math.sqrt(Math.pow(itemX - pdfX, 2) + Math.pow(itemY - pdfY, 2));
+            if (dist < minDistance && dist < 100) {
+              minDistance = dist;
+              closestItem = item;
+            }
+          }
+        }
+
+        if (closestItem) {
+          const rawFontName = closestItem.fontName || "";
+          const lower = rawFontName.toLowerCase();
+          
+          detectedBold = lower.includes("bold") || lower.includes("boldmt") || lower.includes("heavy");
+          detectedItalic = lower.includes("italic") || lower.includes("oblique") || lower.includes("it");
+          detectedFontFamily = mapPdfFontToCSS(rawFontName);
+          detectedFontSize = closestItem.height || 12; 
+          
+          let styleStr = [];
+          if (detectedBold) styleStr.push("Bold");
+          if (detectedItalic) styleStr.push("Italic");
+          const styleSuffix = styleStr.length > 0 ? ` (${styleStr.join(", ")})` : "";
+          
+          const cleanName = rawFontName.split('_').pop() || rawFontName;
+          detectedFontNameDisplay = `Font detected: ${cleanName} ${Math.round(detectedFontSize)}pt${styleSuffix}`;
+        }
+      } catch (err) {
+        console.error("Font detection failed", err);
+      }
+
       onAddEdit({
         id: Math.random().toString(36).substring(7),
         pageIndex,
         type: "text",
-        x: x / scale, 
-        y: y / scale,
+        x: pdfX, 
+        y: pdfY,
         width: 150,
         height: 50,
         text: "",
-        fontSize: 16,
-        colorHex: "#000000"
+        fontSize: detectedFontSize,
+        fontFamily: detectedFontFamily,
+        fontWeight: detectedBold ? "bold" : "normal",
+        fontStyle: detectedItalic ? "italic" : "normal",
+        colorHex: "#000000",
+        detectedFontName: detectedFontNameDisplay
       });
     } else if (activeTool === "draw") {
       setIsDrawing(true);
-      setCurrentPath([{ x, y }]);
+      setCurrentPath([{ x: clientX, y: clientY }]);
     }
   };
 

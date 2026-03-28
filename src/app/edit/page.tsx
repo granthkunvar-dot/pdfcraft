@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { PDFDocument, rgb } from "pdf-lib";
 import { Navbar } from "@/components/layout/Navbar";
 import { DropZone } from "@/components/ui/DropZone";
 import { StatusBar, StatusState } from "@/components/ui/StatusBar";
 import { Toolbar } from "@/components/editor/Toolbar";
 import { FindReplace } from "@/components/editor/FindReplace";
 import { PageCanvas } from "@/components/editor/PageCanvas";
-import { EditTool, PageEdit } from "@/lib/editPdf";
+import { EditTool, PageEdit, getStandardFont } from "@/lib/editPdf";
 import { isValidPDF, downloadBlob } from "@/lib/pdf";
 
 export default function EditPage() {
@@ -23,6 +23,62 @@ export default function EditPage() {
   const [status, setStatus] = useState<StatusState | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [matchCount, setMatchCount] = useState(0);
+
+  // Undo/Redo System
+  const undoStack = useRef<PageEdit[][]>([]);
+  const redoStack = useRef<PageEdit[][]>([]);
+  const [, setHistoryTick] = useState(0);
+
+  const pushToHistory = useCallback((mutation: (prev: PageEdit[]) => PageEdit[]) => {
+    setEdits(prev => {
+      const next = mutation(prev);
+      undoStack.current.push([...prev]);
+      if (undoStack.current.length > 50) undoStack.current.shift();
+      redoStack.current = [];
+      setHistoryTick(n => n + 1);
+      return next;
+    });
+  }, []);
+
+  const undo = useCallback(() => {
+    setEdits(prev => {
+      if (undoStack.current.length === 0) return prev;
+      const prevState = undoStack.current.pop()!;
+      redoStack.current.push([...prev]);
+      setHistoryTick(n => n + 1);
+      return prevState;
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setEdits(prev => {
+      if (redoStack.current.length === 0) return prev;
+      const nextState = redoStack.current.pop()!;
+      undoStack.current.push([...prev]);
+      setHistoryTick(n => n + 1);
+      return nextState;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const cmd = isMac ? e.metaKey : e.ctrlKey;
+      
+      if (cmd && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        undo();
+      } else if (cmd && (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]);
 
   const handleFilesAdded = async (newFiles: File[]) => {
     const selected = newFiles[0];
@@ -49,15 +105,15 @@ export default function EditPage() {
   };
 
   const handleAddEdit = (edit: PageEdit) => {
-    setEdits(prev => [...prev, edit]);
+    pushToHistory(prev => [...prev, edit]);
   };
 
   const handleUpdateEdit = (id: string, updates: Partial<PageEdit>) => {
-    setEdits(prev => prev.map(e => e.id === id ? { ...e, ...updates } as PageEdit : e));
+    pushToHistory(prev => prev.map(e => e.id === id ? { ...e, ...updates } as PageEdit : e));
   };
 
   const handleRemoveEdit = (id: string) => {
-    setEdits(prev => prev.filter(e => e.id !== id));
+    pushToHistory(prev => prev.filter(e => e.id !== id));
   };
 
   const handleFind = async (query: string) => {
@@ -85,8 +141,8 @@ export default function EditPage() {
 
     try {
       const pdfDoc = await PDFDocument.load(originalBytes, { ignoreEncryption: true });
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const pages = pdfDoc.getPages();
+      const fontCache = new Map<any, any>();
 
       for (const edit of edits) {
         if (edit.pageIndex >= pages.length) continue;
@@ -95,6 +151,18 @@ export default function EditPage() {
 
         if (edit.type === "text" && edit.text) {
           const pdfY = height - edit.y - (edit.fontSize || 16);
+          const stFontType = getStandardFont(
+            edit.fontFamily || "Helvetica, sans-serif",
+            edit.fontWeight === "bold",
+            edit.fontStyle === "italic"
+          );
+          
+          let font = fontCache.get(stFontType);
+          if (!font) {
+            font = await pdfDoc.embedFont(stFontType);
+            fontCache.set(stFontType, font);
+          }
+
           page.drawText(edit.text, {
             x: edit.x,
             y: pdfY,
@@ -140,6 +208,10 @@ export default function EditPage() {
             setScale={setScale} 
             onSave={handleSave}
             isProcessing={isProcessing}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={undoStack.current.length > 0}
+            canRedo={redoStack.current.length > 0}
           />
           
           {activeTool === "find" && (
