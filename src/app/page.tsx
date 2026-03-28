@@ -2,9 +2,11 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/home/Hero";
 import { ToolCard } from "@/components/home/ToolCard";
-import { FileUp, SplitSquareHorizontal, FileArchive, RotateCw, Type, Image as ImageIcon, Eye } from "lucide-react";
+import { FileUp, SplitSquareHorizontal, FileArchive, RotateCw, Type, Image as ImageIcon, Eye, Pencil, RefreshCw } from "lucide-react";
 
 const tools = [
+  { title: "Edit PDF", description: "Edit, annotate & sign.", href: "/edit", icon: Pencil },
+  { title: "Convert", description: "Any format ↔ PDF.", href: "/convert", icon: RefreshCw },
   { title: "Merge PDF", description: "Combine multiple PDFs into one unified document.", href: "/merge", icon: FileUp },
   { title: "Split PDF", description: "Extract pages or split a PDF into multiple files.", href: "/split", icon: SplitSquareHorizontal },
   { title: "Compress PDF", description: "Reduce file size while maintaining quality.", href: "/compress", icon: FileArchive },

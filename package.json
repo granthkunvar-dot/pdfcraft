@@ -10,13 +10,19 @@
   },
   "dependencies": {
     "clsx": "^2.1.1",
+    "docx-pdf": "^0.0.1",
+    "html2canvas": "^1.4.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^1.6.0",
+    "mammoth": "^1.12.0",
     "next": "16.2.1",
     "pdf-lib": "^1.17.1",
+    "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.5.207",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
