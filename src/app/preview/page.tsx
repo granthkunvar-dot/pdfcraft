@@ -69,6 +69,7 @@ export default function PreviewPage() {
               const renderContext = {
                 canvasContext: context,
                 viewport: viewport,
+		canvas: canvas,
               };
               renderPromises.push(page.render(renderContext).promise);
             }
