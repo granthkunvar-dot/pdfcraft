@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import * as pdfjsLib from "pdfjs-dist";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { DropZone } from "@/components/ui/DropZone";
@@ -11,13 +10,10 @@ import { Eye, ZoomIn, ZoomOut } from "lucide-react";
 import { PrimaryBtn } from "@/components/ui/PrimaryBtn";
 import { isValidPDF } from "@/lib/pdf";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-
 export default function PreviewPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<any | null>(null);
   const [scale, setScale] = useState(1.5);
-  
   const [status, setStatus] = useState<StatusState | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
@@ -36,9 +32,12 @@ export default function PreviewPage() {
         throw new Error("Invalid PDF file format.");
       }
 
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+
       const task = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
       const doc = await task.promise;
-      
+
       setPdfDoc(doc);
       setFile(selected);
       setStatus(null);
@@ -69,7 +68,6 @@ export default function PreviewPage() {
               const renderContext = {
                 canvasContext: context,
                 viewport: viewport,
-		canvas: canvas,
               };
               renderPromises.push(page.render(renderContext).promise);
             }
@@ -100,7 +98,7 @@ export default function PreviewPage() {
 
         <div className="bg-surface relative rounded-[22px] p-6 md:p-8 border border-surface-border shadow-2xl animate-in fade-in slide-in-from-bottom-4">
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-accent-orange to-accent-yellow rounded-t-[22px]" />
-          
+
           {!file ? (
             <div className="flex justify-center">
               <DropZone onFilesAdded={handleFilesAdded} multiple={false} accept="application/pdf" className="max-w-2xl" />
@@ -116,14 +114,14 @@ export default function PreviewPage() {
                   </span>
                   <div className="h-4 w-[1px] bg-surface-border" />
                   <div className="flex items-center gap-2">
-                    <button 
+                    <button
                       onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
                       className="p-2 bg-surface hover:bg-surface-border rounded-lg transition-colors text-muted hover:text-foreground"
                     >
                       <ZoomOut className="w-4 h-4" />
                     </button>
                     <span className="text-sm font-medium w-12 text-center">{Math.round(scale * 100)}%</span>
-                    <button 
+                    <button
                       onClick={() => setScale(s => Math.min(3, s + 0.25))}
                       className="p-2 bg-surface hover:bg-surface-border rounded-lg transition-colors text-muted hover:text-foreground"
                     >
@@ -131,7 +129,7 @@ export default function PreviewPage() {
                     </button>
                   </div>
                 </div>
-                
+
                 <PrimaryBtn variant="secondary" size="sm" onClick={() => { setFile(null); setPdfDoc(null); setStatus(null); }}>
                   Close Preview
                 </PrimaryBtn>
@@ -158,7 +156,7 @@ export default function PreviewPage() {
               )}
             </div>
           )}
-          
+
           {status?.type === "processing" && !file && (
             <div className="mt-4">
               <StatusBar status={status} />
